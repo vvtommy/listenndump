@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"os"
 )
 
 type TCPListener struct {
@@ -19,8 +20,19 @@ type TCPListener struct {
 }
 
 func handleTCPConnection(connection net.Conn) {
+	var err error
+	var size int
 	firstTime := false
+	dumper := hex.Dumper(os.Stdout)
 	defer func() {
+		_ = dumper.Close()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				slog.Info("Connection closed", slog.String("remote", connection.RemoteAddr().String()))
+			} else {
+				slog.Error("Failed to read from connection, disconnect", err, slog.String("remote", connection.RemoteAddr().String()))
+			}
+		}
 		err := connection.Close()
 		if err != nil {
 			slog.Error("Failed to close connection", err)
@@ -28,13 +40,8 @@ func handleTCPConnection(connection net.Conn) {
 	}()
 	for {
 		buf := make([]byte, 128)
-		size, err := connection.Read(buf)
+		size, err = connection.Read(buf)
 		if err != nil {
-			if errors.Is(err, io.EOF) {
-				slog.Info("Connection closed", slog.String("remote", connection.RemoteAddr().String()))
-				return
-			}
-			slog.Error("Failed to read from connection, disconnect", err, slog.String("remote", connection.RemoteAddr().String()))
 			return
 		}
 		if !firstTime {
@@ -42,8 +49,7 @@ func handleTCPConnection(connection net.Conn) {
 			firstTime = true
 			fmt.Print("\n")
 		}
-		output := hex.Dump(buf[:size])
-		fmt.Print(output)
+		_, _ = dumper.Write(buf[:size])
 	}
 
 }
