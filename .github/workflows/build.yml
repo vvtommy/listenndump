@@ -1,0 +1,35 @@
+name: Go
+
+on:
+  release:
+    types: [published]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Build
+        run: |
+          export VERSION=${GITHUB_REF##*/}
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s -X 'main._version=${VERSION}'" -o ./target/listenndump-linux-amd64 ./
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-w -s -X 'main._version=${VERSION}'" -o ./target/listenndump-linux-arm64 ./
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-w -s -X 'main._version=${VERSION}'" -o ./target/listenndump-darwin-amd64 ./
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-w -s -X 'main._version=${VERSION}'" -o ./target/listenndump-darwin-arm64 ./
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-w -s -X 'main._version=${VERSION}'" -o ./target/listenndump64.exe ./
+
+      - name: Test
+        run: go test -v ./...
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ./target/*
